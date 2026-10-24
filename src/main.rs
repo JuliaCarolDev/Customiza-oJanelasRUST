@@ -1,9 +1,9 @@
+use eframe::egui;
 use windows::{
     Win32::Foundation::*,
     Win32::UI::WindowsAndMessaging::*,
     Win32::UI::Input::KeyboardAndMouse::*,
 };
-use std::io::{self, Write};
 
 // ─── IDs únicos para nossos atalhos (i32!) ───
 const HOTKEY_TILE: i32 = 1;
@@ -50,13 +50,9 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> B
 
 fn get_window_title(hwnd: HWND) -> String {
     let length = unsafe { GetWindowTextLengthW(hwnd) };
-    if length == 0 {
-        return String::new();
-    }
+    if length == 0 { return String::new(); }
     let mut buffer = vec![0u16; (length + 1) as usize];
-    unsafe {
-        GetWindowTextW(hwnd, &mut buffer);
-    }
+    unsafe { GetWindowTextW(hwnd, &mut buffer); }
     String::from_utf16_lossy(&buffer).trim_end_matches('\0').to_string()
 }
 
@@ -64,18 +60,14 @@ fn get_window_class(hwnd: HWND) -> String {
     let mut buffer = [0u16; 256];
     unsafe {
         let len = GetClassNameW(hwnd, &mut buffer);
-        if len > 0 {
-            return String::from_utf16_lossy(&buffer[..len as usize]);
-        }
+        if len > 0 { return String::from_utf16_lossy(&buffer[..len as usize]); }
     }
     String::new()
 }
 
 fn get_window_rect(hwnd: HWND) -> RECT {
     let mut rect = RECT::default();
-    unsafe {
-        let _ = GetWindowRect(hwnd, &mut rect);
-    }
+    unsafe { let _ = GetWindowRect(hwnd, &mut rect); }
     rect
 }
 
@@ -85,54 +77,25 @@ fn list_windows() -> Vec<WindowInfo> {
     unsafe {
         let _ = EnumWindows(Some(enum_windows_callback), LPARAM(list_ptr as isize));
     }
-    list.hwnds
-        .into_iter()
-        .map(|hwnd| {
-            WindowInfo {
-                hwnd,
-                title: get_window_title(hwnd),
-                class: get_window_class(hwnd),
-                rect: get_window_rect(hwnd),
-            }
-        })
-        .collect()
+    list.hwnds.into_iter().map(|hwnd| {
+        WindowInfo {
+            hwnd,
+            title: get_window_title(hwnd),
+            class: get_window_class(hwnd),
+            rect: get_window_rect(hwnd),
+        }
+    }).collect()
 }
 
+// ─── Ações de Janela ───
 fn move_window(hwnd: HWND, x: i32, y: i32, width: i32, height: i32) {
-    unsafe {
-        let _ = SetWindowPos(hwnd, HWND_TOP, x, y, width, height, SWP_SHOWWINDOW);
-    }
+    unsafe { let _ = SetWindowPos(hwnd, HWND_TOP, x, y, width, height, SWP_SHOWWINDOW); }
 }
-
-fn minimize_window(hwnd: HWND) {
-    unsafe {
-        let _ = ShowWindow(hwnd, SW_MINIMIZE);
-    }
-}
-
-fn maximize_window(hwnd: HWND) {
-    unsafe {
-        let _ = ShowWindow(hwnd, SW_MAXIMIZE);
-    }
-}
-
-fn restore_window(hwnd: HWND) {
-    unsafe {
-        let _ = ShowWindow(hwnd, SW_RESTORE);
-    }
-}
-
-fn close_window(hwnd: HWND) {
-    unsafe {
-        let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
-    }
-}
-
-fn bring_to_front(hwnd: HWND) {
-    unsafe {
-        let _ = SetForegroundWindow(hwnd);
-    }
-}
+fn minimize_window(hwnd: HWND) { unsafe { let _ = ShowWindow(hwnd, SW_MINIMIZE); } }
+fn maximize_window(hwnd: HWND) { unsafe { let _ = ShowWindow(hwnd, SW_MAXIMIZE); } }
+fn restore_window(hwnd: HWND) { unsafe { let _ = ShowWindow(hwnd, SW_RESTORE); } }
+fn close_window(hwnd: HWND) { unsafe { let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)); } }
+fn bring_to_front(hwnd: HWND) { unsafe { let _ = SetForegroundWindow(hwnd); } }
 
 fn tile_windows(windows: &[WindowInfo], cols: i32, rows: i32) {
     let screen_width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
@@ -163,18 +126,14 @@ fn minimize_all_windows() {
             minimize_window(win.hwnd);
         }
     }
-    println!("\n🔊 [ATALHO] Todas as janelas minimizadas!");
 }
 
 // ─── Thread de escuta de atalhos globais ───
 fn start_hotkey_listener() {
     std::thread::spawn(|| {
         unsafe {
-            // Registra: Win + T (Tile)
             let _ = RegisterHotKey(HWND::default(), HOTKEY_TILE, MOD_WIN, VK_T.0 as u32);
-            // Registra: Win + C (Cascade)
             let _ = RegisterHotKey(HWND::default(), HOTKEY_CASCADE, MOD_WIN, VK_J.0 as u32);
-            // Registra: Win + M (Minimize All)
             let _ = RegisterHotKey(HWND::default(), HOTKEY_MINIMIZE_ALL, MOD_WIN, VK_M.0 as u32);
 
             let mut msg = MSG::default();
@@ -183,12 +142,10 @@ fn start_hotkey_listener() {
                     let hotkey_id = msg.wParam.0 as i32;
                     match hotkey_id {
                         HOTKEY_TILE => {
-                            println!("\n⚡ [ATALHO] Organizando janelas em Grade (Tile)...");
                             let windows = list_windows();
                             tile_windows(&windows, 2, 2);
                         }
                         HOTKEY_CASCADE => {
-                            println!("\n⚡ [ATALHO] Organizando janelas em Cascata...");
                             let windows = list_windows();
                             cascade_windows(&windows);
                         }
@@ -199,8 +156,6 @@ fn start_hotkey_listener() {
                     }
                 }
             }
-
-            // Limpeza ao fechar a thread
             let _ = UnregisterHotKey(HWND::default(), HOTKEY_TILE);
             let _ = UnregisterHotKey(HWND::default(), HOTKEY_CASCADE);
             let _ = UnregisterHotKey(HWND::default(), HOTKEY_MINIMIZE_ALL);
@@ -208,185 +163,120 @@ fn start_hotkey_listener() {
     });
 }
 
-fn print_menu() {
-    println!("\n╔══════════════════════════════════════════╗");
-    println!("║  🪟  WINDOW MANAGER - RUST (Com Atalhos) ║");
-    println!("══════════════════════════════════════════╣");
-    println!("║  1. Listar janelas                       ║");
-    println!("║  2. Mover/Redimensionar janela           ║");
-    println!("║  3. Minimizar janela                     ║");
-    println!("║  4. Maximizar janela                     ║");
-    println!("║  5. Restaurar janela                     ║");
-    println!("║  6. Fechar janela                        ║");
-    println!("║  7. Trazer para frente                   ║");
-    println!("║  8. Tile (organizar em grade)            ║");
-    println!("║  9. Cascade (organizar em cascata)       ║");
-    println!("║  0. Sair                                 ║");
-    println!("╠══════════════════════════════════════════╣");
-    println!("║  ⌨️  Win+T: Tile | Win+J: Cascade        ║");
-    println!("║  ⌨️  Win+M: Minimizar Tudo               ║");
-    println!("╚══════════════════════════════════════════╝");
-    print!("Escolha uma opção: ");
-    io::stdout().flush().unwrap();
+// ─── Aplicação GUI com eframe/egui ───
+struct WindowManagerApp {
+    windows: Vec<WindowInfo>,
 }
 
-fn main() {
-    println!("🚀 Window Manager iniciado!\n");
+impl WindowManagerApp {
+    fn new() -> Self {
+        let mut app = Self { windows: Vec::new() };
+        app.refresh();
+        app
+    }
 
-    // Inicia o listener de atalhos em segundo plano
-    start_hotkey_listener();
+    fn refresh(&mut self) {
+        self.windows = list_windows();
+    }
+}
 
-    loop {
-        print_menu();
+impl eframe::App for WindowManagerApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let mut needs_refresh = false; // 🔑 Flag para controlar atualização
 
-        let mut choice = String::new();
-        io::stdin().read_line(&mut choice).ok();
-        let choice = choice.trim();
-
-        match choice {
-            "1" => {
-                let windows = list_windows();
-                println!("\n📋 Janelas encontradas ({}):\n", windows.len());
-                for (i, win) in windows.iter().enumerate() {
-                    println!(
-                        "  [{}] \"{}\" (classe: {}) - Pos: ({}, {}), Tamanho: {}x{}",
-                        i,
-                        win.title,
-                        win.class,
-                        win.rect.left,
-                        win.rect.top,
-                        win.rect.right - win.rect.left,
-                        win.rect.bottom - win.rect.top,
-                    );
+        // 1. Barra Superior
+        egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.heading("🪟 Window Manager");
+                ui.add_space(20.0);
+                if ui.button("🔄 Atualizar Lista").clicked() {
+                    needs_refresh = true;
                 }
-                println!();
-            }
-            "2" => {
-                let windows = list_windows();
-                print!("Índice da janela: ");
-                io::stdout().flush().unwrap();
-                let mut idx = String::new();
-                std::io::stdin().read_line(&mut idx).ok();
-                let idx: usize = idx.trim().parse().unwrap_or(0);
+                ui.label(" | ");
+                ui.label("Atalhos: Win+T (Tile) | Win+J (Cascade) | Win+M (Minimizar Tudo)");
+            });
+        });
 
-                if let Some(win) = windows.get(idx) {
-                    print!("X: ");
-                    io::stdout().flush().unwrap();
-                    let mut x = String::new();
-                    std::io::stdin().read_line(&mut x).ok();
-                    let x: i32 = x.trim().parse().unwrap_or(0);
+        // 2. Painel Central (Lista de Janelas)
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.label(format!("Total de janelas encontradas: {}", self.windows.len()));
+            ui.add_space(10.0);
 
-                    print!("Y: ");
-                    io::stdout().flush().unwrap();
-                    let mut y = String::new();
-                    std::io::stdin().read_line(&mut y).ok();
-                    let y: i32 = y.trim().parse().unwrap_or(0);
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                for (i, win) in self.windows.iter().enumerate() {
+                    ui.horizontal(|ui| {
+                        ui.label(format!("{:3}", i));
+                        ui.label(format!("\"{}\"", win.title));
+                        ui.label(egui::RichText::new(format!("(classe: {})", win.class)).weak());
+                        
+                        // Botões de ação alinhados à direita
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.small_button("🎯 Foco").clicked() { 
+                                bring_to_front(win.hwnd); 
+                                needs_refresh = true; //  Marca para atualizar depois
+                            }
+                            if ui.small_button("⬆ Max").clicked() { 
+                                maximize_window(win.hwnd); 
+                                needs_refresh = true;
+                            }
+                            if ui.small_button("⬇ Min").clicked() { 
+                                minimize_window(win.hwnd); 
+                                needs_refresh = true;
+                            }
+                            if ui.small_button("❌ Fechar").clicked() { 
+                                close_window(win.hwnd); 
+                                needs_refresh = true;
+                            }
+                        });
+                    });
+                    ui.separator();
+                }
+            });
+        });
 
-                    print!("Largura: ");
-                    io::stdout().flush().unwrap();
-                    let mut w = String::new();
-                    std::io::stdin().read_line(&mut w).ok();
-                    let w: i32 = w.trim().parse().unwrap_or(800);
+        // 3. Barra Inferior (Ações Globais)
+        egui::TopBottomPanel::bottom("actions").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.add_space(10.0);
+                if ui.button("📐 Tile (2x2)").clicked() { 
+                    tile_windows(&self.windows, 2, 2); 
+                    needs_refresh = true;
+                }
+                if ui.button("🌊 Cascade").clicked() { 
+                    cascade_windows(&self.windows); 
+                    needs_refresh = true;
+                }
+                if ui.button("💤 Minimizar Tudo").clicked() { 
+                    minimize_all_windows(); 
+                    needs_refresh = true;
+                }
+            });
+        });
 
-                    print!("Altura: ");
-                    io::stdout().flush().unwrap();
-                    let mut h = String::new();
-                    std::io::stdin().read_line(&mut h).ok();
-                    let h: i32 = h.trim().parse().unwrap_or(600);
-
-                    move_window(win.hwnd, x, y, w, h);
-                    println!("✅ Janela movida!");
-                } else {
-                    println!("❌ Índice inválido!");
-                }
-            }
-            "3" => {
-                let windows = list_windows();
-                print!("Índice da janela: ");
-                io::stdout().flush().unwrap();
-                let mut idx = String::new();
-                std::io::stdin().read_line(&mut idx).ok();
-                let idx: usize = idx.trim().parse().unwrap_or(0);
-                if let Some(win) = windows.get(idx) {
-                    minimize_window(win.hwnd);
-                    println!("✅ Janela minimizada!");
-                } else {
-                    println!("❌ Índice inválido!");
-                }
-            }
-            "4" => {
-                let windows = list_windows();
-                print!("Índice da janela: ");
-                io::stdout().flush().unwrap();
-                let mut idx = String::new();
-                std::io::stdin().read_line(&mut idx).ok();
-                let idx: usize = idx.trim().parse().unwrap_or(0);
-                if let Some(win) = windows.get(idx) {
-                    maximize_window(win.hwnd);
-                    println!("✅ Janela maximizada!");
-                } else {
-                    println!("❌ Índice inválido!");
-                }
-            }
-            "5" => {
-                let windows = list_windows();
-                print!("Índice da janela: ");
-                io::stdout().flush().unwrap();
-                let mut idx = String::new();
-                std::io::stdin().read_line(&mut idx).ok();
-                let idx: usize = idx.trim().parse().unwrap_or(0);
-                if let Some(win) = windows.get(idx) {
-                    restore_window(win.hwnd);
-                    println!("✅ Janela restaurada!");
-                } else {
-                    println!("❌ Índice inválido!");
-                }
-            }
-            "6" => {
-                let windows = list_windows();
-                print!("Índice da janela: ");
-                io::stdout().flush().unwrap();
-                let mut idx = String::new();
-                std::io::stdin().read_line(&mut idx).ok();
-                let idx: usize = idx.trim().parse().unwrap_or(0);
-                if let Some(win) = windows.get(idx) {
-                    close_window(win.hwnd);
-                    println!("✅ Janela fechada!");
-                } else {
-                    println!(" Índice inválido!");
-                }
-            }
-            "7" => {
-                let windows = list_windows();
-                print!("Índice da janela: ");
-                io::stdout().flush().unwrap();
-                let mut idx = String::new();
-                std::io::stdin().read_line(&mut idx).ok();
-                let idx: usize = idx.trim().parse().unwrap_or(0);
-                if let Some(win) = windows.get(idx) {
-                    bring_to_front(win.hwnd);
-                    println!("✅ Janela trazida para frente!");
-                } else {
-                    println!("❌ Índice inválido!");
-                }
-            }
-            "8" => {
-                let windows = list_windows();
-                tile_windows(&windows, 2, 2);
-                println!("✅ Janelas organizadas em tile!");
-            }
-            "9" => {
-                let windows = list_windows();
-                cascade_windows(&windows);
-                println!("✅ Janelas organizadas em cascata!");
-            }
-            "0" => {
-                println!(" Saindo e limpando atalhos...");
-                break;
-            }
-            _ => {
-                println!("❌ Opção inválida!");
-            }
+        // 🔑 Atualiza a lista SE necessário (depois que todos os borrows terminaram)
+        if needs_refresh {
+            self.refresh();
         }
     }
+}
+
+// ─── Ponto de Entrada ───
+fn main() -> Result<(), eframe::Error> {
+    println!("🚀 Iniciando Window Manager em segundo plano...");
+    
+    // Inicia os atalhos globais em uma thread separada
+    start_hotkey_listener();
+
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([900.0, 600.0])
+            .with_title("🪟 Window Manager - Rust"),
+        ..Default::default()
+    };
+
+    eframe::run_native(
+        "Window Manager",
+        options,
+        Box::new(|_cc| Ok(Box::new(WindowManagerApp::new()))),
+    )
 }

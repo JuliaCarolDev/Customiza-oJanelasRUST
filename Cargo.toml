@@ -4,9 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+egui = "0.29"
+eframe = "0.29"
 windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
-    "Win32_UI_Input_KeyboardAndMouse",  # <-- NOVO: Para teclas virtuais (VK_*) e modificadores (MOD_*)
+    "Win32_UI_Input_KeyboardAndMouse",
     "Win32_System_Threading",
 ] }
